@@ -722,10 +722,21 @@
   </div>
 </button>
 
-<!-- HIDDEN AUDIO -->
-<audio id="bg-music" loop>
+<!-- AUDIO -->
+<audio id="bg-music" loop preload="auto">
   <source src="music.mp3" type="audio/mpeg">
 </audio>
+
+<!-- NUDGE SHOWN IF AUTOPLAY IS BLOCKED -->
+<div id="play-nudge" style="
+  display:none;position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);
+  z-index:300;background:rgba(255,255,255,0.9);backdrop-filter:blur(14px);
+  border:1.5px solid rgba(244,114,182,0.5);border-radius:50px;
+  padding:0.6rem 1.6rem;font-family:'Nunito',sans-serif;font-size:0.88rem;
+  font-weight:700;color:#7e3a8a;cursor:pointer;
+  box-shadow:0 6px 28px rgba(244,114,182,0.3);white-space:nowrap;
+  animation:fadeInUp 0.5s ease forwards;
+" onclick="nudgePlay()">🎵 Tap to start music ✨</div>
 
 <!-- SURPRISE OVERLAY -->
 <div id="surprise-overlay">
@@ -932,18 +943,61 @@ let musicPlaying = false;
 const audio = document.getElementById('bg-music');
 const waves = document.getElementById('music-waves');
 const label = document.getElementById('music-label');
+const nudge = document.getElementById('play-nudge');
+
+function startMusic() {
+  return audio.play().then(() => {
+    musicPlaying = true;
+    waves.classList.remove('paused');
+    if (label) label.textContent = 'Pause';
+    nudge.style.display = 'none';
+  }).catch(() => {});
+}
+
+// Try autoplay right away (works if browser allows)
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    startMusic().then(() => {
+      // Success — music playing silently
+    }).catch(() => {
+      // Browser blocked autoplay — show nudge
+      nudge.style.display = 'block';
+    });
+    // Also show nudge if audio never started after 1s
+    setTimeout(() => {
+      if (!musicPlaying) nudge.style.display = 'block';
+    }, 1000);
+  }, 2400); // slight delay after loader hides
+});
+
+// One-time autoplay on first user gesture (scroll, touch, click)
+let gestureUnlocked = false;
+function unlockOnGesture() {
+  if (!gestureUnlocked && !musicPlaying) {
+    gestureUnlocked = true;
+    startMusic();
+    ['click','touchstart','scroll','keydown'].forEach(e =>
+      document.removeEventListener(e, unlockOnGesture)
+    );
+  }
+}
+['click','touchstart','scroll','keydown'].forEach(e =>
+  document.addEventListener(e, unlockOnGesture, { passive: true })
+);
+
+function nudgePlay() {
+  startMusic();
+  nudge.style.display = 'none';
+}
 
 function toggleMusic() {
   if (!musicPlaying) {
-    audio.play().catch(() => {});
-    musicPlaying = true;
-    waves.classList.remove('paused');
-    label.textContent = 'Pause';
+    startMusic();
   } else {
     audio.pause();
     musicPlaying = false;
     waves.classList.add('paused');
-    label.textContent = 'Music';
+    if (label) label.textContent = 'Music';
   }
 }
 
